@@ -1,33 +1,11 @@
--- =====================================================================
--- TurismoUQ - Script 02: Carga de datos
--- Genera los datos con PL/SQL y DBMS_RANDOM. Se fija una semilla
--- (DBMS_RANDOM.SEED) para que cada ejecucion produzca exactamente los
--- mismos datos y los resultados de las consultas se puedan reproducir.
---
--- Fecha de corte de los datos: 22/10/2026 ("hoy" para la plataforma).
---   * Estadias que terminaron antes del corte -> completada o cancelada
---   * Estadias en curso al corte              -> confirmada
---   * Estadias futuras                        -> pendiente, confirmada o cancelada
---
--- Reglas que la carga respeta (ver documento del modelo):
---   RN01  ninguna habitacion queda con dos reservas solapadas
---   RN02  las fechas de cada linea estan dentro del rango de la reserva
---   RN05  toda habitacion tiene tarifa para todas las temporadas
---   RN06  los pagos se calculan sobre el valor real (noches + servicios)
---   RN07  cancelaciones con mas de 5 dias de anticipacion -> reembolso 80%
---   RN08  solo hay resenas de reservas completadas
---   RN10  los servicios contratados son del mismo alojamiento de la reserva
---   Todas las habitaciones de una reserva son del mismo alojamiento.
--- =====================================================================
+-- Script 02: carga de datos con DBMS_RANDOM (semilla fija, datos reproducibles)
+-- Fecha de corte de los datos: 22/10/2026
 
 SET SERVEROUTPUT ON
 SET SQLBLANKLINES ON
 
 
--- ---------------------------------------------------------------------
--- 1. Municipios: los 12 municipios del Quindio
---    (el orden de insercion define los id 1..12 que usa el bloque 4)
--- ---------------------------------------------------------------------
+-- 1. Municipios
 INSERT INTO MUNICIPIO (nombre) VALUES ('Armenia');
 INSERT INTO MUNICIPIO (nombre) VALUES ('Buenavista');
 INSERT INTO MUNICIPIO (nombre) VALUES ('Calarca');
@@ -42,9 +20,7 @@ INSERT INTO MUNICIPIO (nombre) VALUES ('Quimbaya');
 INSERT INTO MUNICIPIO (nombre) VALUES ('Salento');
 
 
--- ---------------------------------------------------------------------
--- 2. Tipos de alojamiento (id 1..4)
--- ---------------------------------------------------------------------
+-- 2. Tipos de alojamiento
 INSERT INTO TIPO_ALOJAMIENTO (nombre, descripcion)
 VALUES ('Finca cafetera', 'Alojamiento rural relacionado con la cultura cafetera');
 
@@ -58,15 +34,8 @@ INSERT INTO TIPO_ALOJAMIENTO (nombre, descripcion)
 VALUES ('Hostal', 'Alojamiento economico de menor capacidad');
 
 
--- ---------------------------------------------------------------------
--- 3. Temporadas 2024 - 2026
---    Alta: inicio de anio (enero), Semana Santa, mitad de anio,
---          puente festivo de octubre y fin de anio (diciembre).
---    El resto del anio se reparte entre media y baja.
---    Las temporadas cubren todos los dias de 2024 a 2026 sin solaparse,
---    asi cada noche tiene exactamente una tarifa (RN04 y RN05).
--- ---------------------------------------------------------------------
--- 2024 (Semana Santa: 23 al 31 de marzo)
+-- 3. Temporadas 2024-2026 (cubren todos los dias sin solaparse)
+-- 2024
 INSERT INTO TEMPORADA (nombre, categoria, anio, fecha_inicio, fecha_fin) VALUES ('Alta Inicio de anio 2024',   'alta',  2024, DATE '2024-01-01', DATE '2024-01-12');
 INSERT INTO TEMPORADA (nombre, categoria, anio, fecha_inicio, fecha_fin) VALUES ('Baja Enero-Marzo 2024',      'baja',  2024, DATE '2024-01-13', DATE '2024-03-22');
 INSERT INTO TEMPORADA (nombre, categoria, anio, fecha_inicio, fecha_fin) VALUES ('Alta Semana Santa 2024',     'alta',  2024, DATE '2024-03-23', DATE '2024-03-31');
@@ -79,7 +48,7 @@ INSERT INTO TEMPORADA (nombre, categoria, anio, fecha_inicio, fecha_fin) VALUES 
 INSERT INTO TEMPORADA (nombre, categoria, anio, fecha_inicio, fecha_fin) VALUES ('Media Diciembre 2024',       'media', 2024, DATE '2024-12-01', DATE '2024-12-15');
 INSERT INTO TEMPORADA (nombre, categoria, anio, fecha_inicio, fecha_fin) VALUES ('Alta Fin de anio 2024',      'alta',  2024, DATE '2024-12-16', DATE '2024-12-31');
 
--- 2025 (Semana Santa: 12 al 20 de abril)
+-- 2025
 INSERT INTO TEMPORADA (nombre, categoria, anio, fecha_inicio, fecha_fin) VALUES ('Alta Inicio de anio 2025',   'alta',  2025, DATE '2025-01-01', DATE '2025-01-12');
 INSERT INTO TEMPORADA (nombre, categoria, anio, fecha_inicio, fecha_fin) VALUES ('Baja Enero-Abril 2025',      'baja',  2025, DATE '2025-01-13', DATE '2025-04-11');
 INSERT INTO TEMPORADA (nombre, categoria, anio, fecha_inicio, fecha_fin) VALUES ('Alta Semana Santa 2025',     'alta',  2025, DATE '2025-04-12', DATE '2025-04-20');
@@ -92,7 +61,7 @@ INSERT INTO TEMPORADA (nombre, categoria, anio, fecha_inicio, fecha_fin) VALUES 
 INSERT INTO TEMPORADA (nombre, categoria, anio, fecha_inicio, fecha_fin) VALUES ('Media Diciembre 2025',       'media', 2025, DATE '2025-12-01', DATE '2025-12-15');
 INSERT INTO TEMPORADA (nombre, categoria, anio, fecha_inicio, fecha_fin) VALUES ('Alta Fin de anio 2025',      'alta',  2025, DATE '2025-12-16', DATE '2025-12-31');
 
--- 2026 (Semana Santa: 28 de marzo al 5 de abril)
+-- 2026
 INSERT INTO TEMPORADA (nombre, categoria, anio, fecha_inicio, fecha_fin) VALUES ('Alta Inicio de anio 2026',   'alta',  2026, DATE '2026-01-01', DATE '2026-01-12');
 INSERT INTO TEMPORADA (nombre, categoria, anio, fecha_inicio, fecha_fin) VALUES ('Baja Enero-Marzo 2026',      'baja',  2026, DATE '2026-01-13', DATE '2026-03-27');
 INSERT INTO TEMPORADA (nombre, categoria, anio, fecha_inicio, fecha_fin) VALUES ('Alta Semana Santa 2026',     'alta',  2026, DATE '2026-03-28', DATE '2026-04-05');
@@ -106,16 +75,12 @@ INSERT INTO TEMPORADA (nombre, categoria, anio, fecha_inicio, fecha_fin) VALUES 
 INSERT INTO TEMPORADA (nombre, categoria, anio, fecha_inicio, fecha_fin) VALUES ('Alta Fin de anio 2026',      'alta',  2026, DATE '2026-12-16', DATE '2026-12-31');
 
 
--- ---------------------------------------------------------------------
--- 4. Alojamientos (60), repartidos de forma desigual entre municipios.
---    Armenia y Calarca son mas urbanos (mas hoteles y hostales); en el
---    resto predominan fincas cafeteras y glampings.
--- ---------------------------------------------------------------------
+-- 4. Alojamientos (60, repartidos de forma desigual)
 DECLARE
     TYPE t_numeros IS VARRAY(12) OF NUMBER;
     TYPE t_textos  IS VARRAY(60) OF VARCHAR2(40);
 
-    -- Cantidad de alojamientos por municipio (mismo orden del bloque 1)
+    -- Alojamientos por municipio
     v_cantidad t_numeros := t_numeros(12, 2, 7, 3, 2, 6, 2, 4, 6, 1, 5, 10);
 
     v_nombres t_textos := t_textos(
@@ -159,7 +124,6 @@ BEGIN
                                ELSE 2 END;
             END IF;
 
-            -- Estrellas autoasignadas y direccion segun el tipo
             CASE v_tipo
                 WHEN 1 THEN v_prefijo := 'Finca ';    v_estrellas := TRUNC(DBMS_RANDOM.VALUE(2, 5));
                 WHEN 2 THEN v_prefijo := 'Hotel ';    v_estrellas := TRUNC(DBMS_RANDOM.VALUE(3, 6));
@@ -194,11 +158,7 @@ END;
 /
 
 
--- ---------------------------------------------------------------------
--- 5. Habitaciones: asimetricas segun el tipo de alojamiento
---    Hotel 15-40, Hostal 5-12, Glamping 3-8, Finca 3-6.
---    La capacidad depende del tipo de habitacion.
--- ---------------------------------------------------------------------
+-- 5. Habitaciones (Hotel 15-40, Hostal 5-12, Glamping 3-8, Finca 3-6)
 DECLARE
     v_cantidad  NUMBER;
     v_tipo      VARCHAR2(50);
@@ -220,7 +180,6 @@ BEGIN
         FOR h IN 1..v_cantidad LOOP
             v_r := DBMS_RANDOM.VALUE;
 
-            -- Tipo de habitacion segun el tipo de alojamiento
             v_tipo := CASE a.id_tipo_alojamiento
                           WHEN 2 THEN CASE WHEN v_r < 0.35 THEN 'Sencilla'
                                            WHEN v_r < 0.80 THEN 'Doble'
@@ -241,7 +200,7 @@ BEGIN
                                ELSE                 TRUNC(DBMS_RANDOM.VALUE(4, 7))
                            END;
 
-            -- Los hoteles numeran por piso (101, 102 ... 201 ...)
+            -- Los hoteles numeran por piso
             IF a.id_tipo_alojamiento = 2 THEN
                 v_numero := TO_CHAR((TRUNC((h - 1) / 10) + 1) * 100 + MOD(h - 1, 10) + 1);
             ELSE
@@ -264,12 +223,7 @@ END;
 /
 
 
--- ---------------------------------------------------------------------
--- 6. Tarifas: una por cada habitacion x temporada (se deriva del cruce).
---    Cada alojamiento decide cuanto sube en temporada alta (entre 10% y
---    60%); la media sube menos de la mitad de eso. Cada anio los precios
---    suben alrededor de 6%.
--- ---------------------------------------------------------------------
+-- 6. Tarifas: una por habitacion y temporada
 DECLARE
     v_base_tipo NUMBER;
     v_alza_alta NUMBER;
@@ -322,11 +276,7 @@ END;
 /
 
 
--- ---------------------------------------------------------------------
--- 7. Servicios complementarios: cada alojamiento ofrece los suyos
---    (Hotel 3-5, Finca y Glamping 2-4, Hostal 1-2), tomados de un
---    catalogo, con precio propio de cada alojamiento.
--- ---------------------------------------------------------------------
+-- 7. Servicios de cada alojamiento
 DECLARE
     TYPE t_textos  IS VARRAY(10) OF VARCHAR2(100);
     TYPE t_numeros IS VARRAY(10) OF NUMBER;
@@ -364,7 +314,6 @@ BEGIN
                           ELSE        TRUNC(DBMS_RANDOM.VALUE(2, 5))
                       END;
 
-        -- Se toman servicios consecutivos del catalogo para no repetir
         v_inicio := TRUNC(DBMS_RANDOM.VALUE(1, 11));
 
         FOR s IN 1..v_cantidad LOOP
@@ -383,10 +332,7 @@ END;
 /
 
 
--- ---------------------------------------------------------------------
--- 8. Clientes (3.000) con ciudades de origen variadas y ponderadas
---    (mas visitantes de Bogota, Medellin y Cali; algunos extranjeros).
--- ---------------------------------------------------------------------
+-- 8. Clientes (3.000)
 DECLARE
     TYPE t_textos  IS VARRAY(20) OF VARCHAR2(50);
     TYPE t_numeros IS VARRAY(20) OF NUMBER;
@@ -404,7 +350,7 @@ DECLARE
         'Ibague', 'Barranquilla', 'Bucaramanga', 'Cartagena', 'Calarca',
         'Neiva', 'Tulua', 'Cucuta', 'Madrid', 'Ciudad de Mexico', 'Miami',
         'Buenos Aires', 'Santiago de Chile', 'Quito');
-    -- Porcentaje acumulado de cada ciudad (suma 100)
+    -- Porcentaje acumulado de cada ciudad
     v_acumulado t_numeros := t_numeros(
         25, 40, 52, 59, 66, 71, 75, 78, 81, 84, 86, 88, 90, 92, 94, 95.5, 97, 98, 99, 100);
 
@@ -438,37 +384,26 @@ END;
 /
 
 
--- ---------------------------------------------------------------------
--- 9. Reservas, habitaciones reservadas y servicios contratados.
---    Se simula el calendario dia por dia (2024-2026) para cada
---    alojamiento. Cada habitacion guarda la fecha en que vuelve a quedar
---    libre (v_libre), por eso nunca se generan solapes (RN01).
---    La probabilidad de que una habitacion libre se reserve un dia
---    depende de:
---      * la temporada (alta x2.2, media x1, baja x0.55)
---      * el dia de la semana (viernes y sabado x1.6)
---      * la popularidad del municipio y del alojamiento
---    Un 12% de las reservas son de grupo (2 o 3 habitaciones) y en
---    algunas lineas del grupo una persona llega un dia despues.
--- ---------------------------------------------------------------------
+-- 9. Reservas, habitaciones reservadas y servicios contratados
+-- Se recorre el calendario dia por dia; v_libre guarda cuando queda libre
+-- cada habitacion, asi no hay solapes. La demanda depende de la temporada,
+-- el dia de la semana y la popularidad del municipio.
 DECLARE
     TYPE t_numeros   IS TABLE OF NUMBER INDEX BY PLS_INTEGER;
     TYPE t_fechas    IS TABLE OF DATE INDEX BY PLS_INTEGER;
     TYPE t_textos    IS TABLE OF VARCHAR2(10) INDEX BY PLS_INTEGER;
 
     c_inicio CONSTANT DATE   := DATE '2024-01-01';
-    c_fin    CONSTANT DATE   := DATE '2026-12-31';   -- ultima noche posible
-    c_corte  CONSTANT DATE   := DATE '2026-10-22';   -- fecha de corte de los datos
+    c_fin    CONSTANT DATE   := DATE '2026-12-31';
+    c_corte  CONSTANT DATE   := DATE '2026-10-22';
     c_base   CONSTANT NUMBER := 0.036;               -- probabilidad base diaria
 
-    -- Popularidad de cada municipio (mismo orden del bloque 1)
     v_pop_municipio t_numeros;
-
-    v_categoria_dia t_textos;     -- categoria de temporada de cada dia
-    v_habitaciones  t_numeros;    -- habitaciones del alojamiento
+    v_categoria_dia t_textos;
+    v_habitaciones  t_numeros;
     v_capacidades   t_numeros;
-    v_servicios     t_numeros;    -- servicios del alojamiento
-    v_libre         t_fechas;     -- dia en que cada habitacion queda libre
+    v_servicios     t_numeros;
+    v_libre         t_fechas;
 
     v_dia            DATE;
     v_demanda        NUMBER;
@@ -488,6 +423,7 @@ DECLARE
     v_id_servicio    NUMBER;
     v_r              NUMBER;
 BEGIN
+    -- Popularidad de cada municipio
     v_pop_municipio(1)  := 1.00;  -- Armenia
     v_pop_municipio(2)  := 0.60;  -- Buenavista
     v_pop_municipio(3)  := 0.80;  -- Calarca
@@ -501,7 +437,7 @@ BEGIN
     v_pop_municipio(11) := 1.10;  -- Quimbaya
     v_pop_municipio(12) := 1.40;  -- Salento
 
-    -- Categoria de temporada de cada dia (indice = dias desde c_inicio)
+    -- Categoria de temporada de cada dia
     FOR t IN (SELECT categoria, fecha_inicio, fecha_fin FROM TEMPORADA) LOOP
         v_dia := t.fecha_inicio;
         WHILE v_dia <= t.fecha_fin LOOP
@@ -549,7 +485,7 @@ BEGIN
 
                 IF v_libre(k) <= v_dia AND DBMS_RANDOM.VALUE < v_demanda THEN
 
-                    -- Duracion: la mayoria 1 a 3 noches, algunas hasta 7
+                    -- Noches de la estadia
                     v_r := DBMS_RANDOM.VALUE;
                     v_noches := CASE WHEN v_r < 0.30 THEN 1
                                      WHEN v_r < 0.65 THEN 2
@@ -561,7 +497,7 @@ BEGIN
 
                     IF v_checkout <= c_fin + 1 THEN
 
-                        -- Anticipacion: la mayoria reserva 1 a 30 dias antes
+                        -- Fecha en que se hizo la reserva
                         IF DBMS_RANDOM.VALUE < 0.8 THEN
                             v_fecha_reserva := v_checkin - TRUNC(DBMS_RANDOM.VALUE(1, 31));
                         ELSE
@@ -571,7 +507,7 @@ BEGIN
                             v_fecha_reserva := c_corte - TRUNC(DBMS_RANDOM.VALUE(0, 15));
                         END IF;
 
-                        -- Estado coherente con la fecha de corte
+                        -- Estado segun la fecha de corte
                         v_r := DBMS_RANDOM.VALUE;
                         IF v_checkout <= c_corte THEN
                             v_estado := CASE WHEN v_r < 0.12 THEN 'cancelada' ELSE 'completada' END;
@@ -594,7 +530,6 @@ BEGIN
                             END IF;
                         END IF;
 
-                        -- Algunos clientes reservan mucho mas que otros
                         INSERT INTO RESERVA (
                             id_cliente, fecha_reserva, fecha_checkin,
                             fecha_checkout, estado, fecha_cancelacion
@@ -609,7 +544,6 @@ BEGIN
                         )
                         RETURNING id_reserva INTO v_id_reserva;
 
-                        -- Habitacion principal de la reserva
                         INSERT INTO RESERVA_HABITACION (
                             id_reserva, id_habitacion, fecha_entrada,
                             fecha_salida, num_huespedes
@@ -623,7 +557,7 @@ BEGIN
                         );
                         v_libre(k) := v_checkout;
 
-                        -- Reservas de grupo: 1 o 2 habitaciones libres mas
+                        -- Reservas de grupo (1 o 2 habitaciones mas)
                         IF v_habitaciones.COUNT > 1 AND DBMS_RANDOM.VALUE < 0.12 THEN
                             v_extra := TRUNC(DBMS_RANDOM.VALUE(1, 3));
 
@@ -653,7 +587,7 @@ BEGIN
                             END LOOP;
                         END IF;
 
-                        -- Servicios del mismo alojamiento (RN10): 0 a 3 distintos
+                        -- Servicios del mismo alojamiento
                         IF v_servicios.COUNT > 0 THEN
                             v_r := DBMS_RANDOM.VALUE;
                             v_num_servicios := CASE WHEN v_r < 0.12 THEN 0
@@ -686,28 +620,12 @@ END;
 /
 
 
--- ---------------------------------------------------------------------
--- 10. Pagos, calculados sobre el valor real de cada reserva.
---     Valor = noches (tarifa de la temporada de cada noche) + servicios.
---     El valor de las noches se obtiene cruzando cada linea con las
---     temporadas que atraviesa: noches de la linea dentro de la temporada
---     x tarifa de esa temporada.
---     Reglas de los pagos:
---       completada : pago total, o anticipo (30-50%) + saldo al check-in
---                    (6% tiene ademas un intento fallido)
---       confirmada : tiene al menos un anticipo exitoso; si la estadia ya
---                    empezo, el saldo se pago al check-in
---       pendiente  : sin pago exitoso (la mitad tiene un pago PSE pendiente)
---       cancelada  : 70% alcanzo a pagar anticipo; si cancelo con mas de
---                    5 dias de anticipacion se registra un movimiento
---                    'reembolsado' por el 80% de lo pagado (RN07)
--- ---------------------------------------------------------------------
+-- 10. Pagos segun el valor de cada reserva (noches + servicios) y su estado
 DECLARE
     c_corte CONSTANT DATE := DATE '2026-10-22';
 
     v_anticipo NUMBER;
 
-    -- Metodo de pago en linea (anticipos) o cualquiera (saldo en el alojamiento)
     FUNCTION metodo(p_incluye_efectivo BOOLEAN) RETURN VARCHAR2 IS
         v_r NUMBER := DBMS_RANDOM.VALUE;
     BEGIN
@@ -813,11 +731,7 @@ END;
 /
 
 
--- ---------------------------------------------------------------------
--- 11. Resenas: solo de reservas completadas (RN08), alrededor del 55%.
---     Cada alojamiento tiene una "calidad" propia, asi las calificaciones
---     varian entre alojamientos (unos muy bien calificados, otros no).
--- ---------------------------------------------------------------------
+-- 11. Resenas de reservas completadas
 DECLARE
     TYPE t_numeros IS TABLE OF NUMBER INDEX BY PLS_INTEGER;
     TYPE t_textos  IS VARRAY(5) OF VARCHAR2(200);
@@ -869,10 +783,7 @@ END;
 /
 
 
--- ---------------------------------------------------------------------
--- 12. Usuarios del sistema: 2 administradores y 2 encargados por cada
---     tipo de alojamiento (los dos primeros alojamientos de cada tipo).
--- ---------------------------------------------------------------------
+-- 12. Usuarios: 2 administradores y 2 encargados por tipo de alojamiento
 INSERT INTO USUARIO_SISTEMA (id_alojamiento, nombre_usuario, clave, rol, estado)
 VALUES (NULL, 'admin.general', 'hash_admin_general', 'administrador', 'activo');
 
@@ -896,10 +807,7 @@ WHERE fila <= 2;
 COMMIT;
 
 
--- ---------------------------------------------------------------------
--- 13. Verificacion de la carga
--- ---------------------------------------------------------------------
--- 13.1 Volumen por tabla
+-- 13. Verificacion: cantidad de filas por tabla
 SELECT 'MUNICIPIO' tabla, COUNT(*) cantidad FROM MUNICIPIO
 UNION ALL SELECT 'TIPO_ALOJAMIENTO', COUNT(*) FROM TIPO_ALOJAMIENTO
 UNION ALL SELECT 'ALOJAMIENTO', COUNT(*) FROM ALOJAMIENTO
@@ -915,9 +823,8 @@ UNION ALL SELECT 'RESERVA_SERVICIO', COUNT(*) FROM RESERVA_SERVICIO
 UNION ALL SELECT 'RESENA', COUNT(*) FROM RESENA
 UNION ALL SELECT 'USUARIO_SISTEMA', COUNT(*) FROM USUARIO_SISTEMA;
 
--- 13.2 Coherencia (todas las columnas deben dar 0, excepto el % de resenas >= 40)
+-- Verificacion de coherencia (todo debe dar 0, excepto el % de resenas)
 SELECT
-    -- RN01: pares de lineas de la misma habitacion que se solapan
     (SELECT COUNT(*)
      FROM RESERVA_HABITACION a
      JOIN RESERVA_HABITACION b
@@ -930,7 +837,6 @@ SELECT
      WHERE ra.estado <> 'cancelada'
        AND rb.estado <> 'cancelada') AS solapes,
 
-    -- Alojamientos sin ninguna reserva
     (SELECT COUNT(*)
      FROM ALOJAMIENTO a
      WHERE NOT EXISTS (SELECT 1
@@ -938,20 +844,17 @@ SELECT
                        JOIN RESERVA_HABITACION rh ON rh.id_habitacion = h.id_habitacion
                        WHERE h.id_alojamiento = a.id_alojamiento)) AS alojamientos_sin_reservas,
 
-    -- Dias de 2024-2026 sin temporada o con mas de una
     (SELECT COUNT(*)
      FROM (SELECT DATE '2024-01-01' + LEVEL - 1 AS dia
            FROM DUAL CONNECT BY LEVEL <= DATE '2027-01-01' - DATE '2024-01-01') d
      WHERE (SELECT COUNT(*) FROM TEMPORADA t
             WHERE d.dia BETWEEN t.fecha_inicio AND t.fecha_fin) <> 1) AS dias_sin_temporada_unica,
 
-    -- RN08: resenas de reservas no completadas
     (SELECT COUNT(*)
      FROM RESENA re
      JOIN RESERVA r ON r.id_reserva = re.id_reserva
      WHERE r.estado <> 'completada') AS resenas_invalidas,
 
-    -- RN10: servicios de otro alojamiento distinto al de la reserva
     (SELECT COUNT(*)
      FROM RESERVA_SERVICIO rs
      JOIN SERVICIO s ON s.id_servicio = rs.id_servicio
@@ -961,20 +864,18 @@ SELECT
                        WHERE rh.id_reserva = rs.id_reserva
                          AND h.id_alojamiento = s.id_alojamiento)) AS servicios_otro_alojamiento,
 
-    -- Huespedes por encima de la capacidad de la habitacion
     (SELECT COUNT(*)
      FROM RESERVA_HABITACION rh
      JOIN HABITACION h ON h.id_habitacion = rh.id_habitacion
      WHERE rh.num_huespedes > h.capacidad_maxima) AS capacidad_excedida,
 
-    -- Porcentaje de reservas completadas que tienen resena
     (SELECT ROUND(100 * COUNT(re.id_resena) / NULLIF(COUNT(*), 0), 1)
      FROM RESERVA r
      LEFT JOIN RESENA re ON re.id_reserva = r.id_reserva
      WHERE r.estado = 'completada') AS pct_resenas
 FROM DUAL;
 
--- 13.3 Distribucion de reservas por estado
+-- Reservas por estado
 SELECT estado, COUNT(*) AS reservas
 FROM RESERVA
 GROUP BY estado

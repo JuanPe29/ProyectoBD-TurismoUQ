@@ -1,10 +1,4 @@
--- =====================================================================
--- TurismoUQ - Script 01: Tablas y restricciones (DDL)
--- Crea las 14 tablas del modelo con sus PK, FK, CHECK, NOT NULL y UNIQUE.
--- Ejecutar conectado como TURISMOUQ sobre un esquema vacio.
--- =====================================================================
-
--- Permite lineas en blanco dentro de las sentencias (SQL*Plus)
+-- Script 01: tablas y restricciones del modelo
 SET SQLBLANKLINES ON
 
 --Municipio
@@ -105,7 +99,6 @@ CREATE TABLE TEMPORADA (
     CONSTRAINT ck_temporada_categoria
         CHECK (categoria IN ('alta', 'media', 'baja')),
 
-    -- Cada temporada pertenece a un solo anio (Semana Santa 2025 y 2026 son filas distintas)
     CONSTRAINT ck_temporada_mismo_anio
         CHECK (
             EXTRACT(YEAR FROM fecha_inicio) = anio
@@ -177,11 +170,9 @@ CREATE TABLE RESERVA (
     CONSTRAINT ck_reserva_fechas
         CHECK (fecha_checkout > fecha_checkin),
 
-    -- La reserva se hace antes (o el mismo dia) del check-in
     CONSTRAINT ck_reserva_fecha_reserva
         CHECK (fecha_reserva <= fecha_checkin),
 
-    -- Solo las reservas canceladas tienen fecha de cancelacion (necesaria para RN07)
     CONSTRAINT ck_reserva_cancelacion
         CHECK (
             (estado = 'cancelada' AND fecha_cancelacion >= fecha_reserva)
@@ -371,7 +362,6 @@ CREATE TABLE USUARIO_SISTEMA (
             )
         ),
 
-    -- El encargado siempre pertenece a un alojamiento; el administrador no
     CONSTRAINT ck_usuario_rol_alojamiento
         CHECK (
             (rol = 'encargado' AND id_alojamiento IS NOT NULL)

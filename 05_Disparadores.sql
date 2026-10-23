@@ -1,20 +1,9 @@
--- =====================================================================
--- TurismoUQ - Script 05: Disparadores (Entrega 2)
---   A. Auditoria de cambios sobre TARIFA con disparador a nivel de
---      sentencia (quien, cuando, valor anterior y nuevo).
---   B. Disparador a nivel de fila que impide registrar una habitacion
---      en una reserva si se solapa con otra reserva de esa habitacion.
--- Requiere el paquete PKG_TURISMOUQ (script 04).
--- =====================================================================
+-- Script 05: disparadores (auditoria de TARIFA y solapes de reservas)
 
 SET SQLBLANKLINES ON
 
 
--- ---------------------------------------------------------------------
--- A. AUDITORIA DE TARIFA
--- ---------------------------------------------------------------------
--- A.1 Tabla de auditoria. No tiene FK a TARIFA para que el registro se
---     conserve aunque la tarifa se borre.
+-- A. Auditoria de TARIFA
 CREATE TABLE AUDITORIA_TARIFA (
     id_auditoria    NUMBER GENERATED ALWAYS AS IDENTITY,
     id_tarifa       NUMBER NOT NULL,
@@ -39,16 +28,10 @@ COMMENT ON TABLE AUDITORIA_TARIFA IS
 'Historial de cambios de TARIFA: quien (usuario BD/SO/equipo), cuando, precio anterior y nuevo';
 
 
--- Un disparador de sentencia se ejecuta UNA vez por instruccion y no
--- puede leer :OLD ni :NEW. Por eso la auditoria se arma en tres pasos:
---   1) antes de la sentencia se limpia la lista en memoria del paquete
---   2) por cada fila modificada se guarda su valor anterior y nuevo
---   3) despues de la sentencia (disparador de sentencia) se escriben
---      todos los cambios en AUDITORIA_TARIFA junto con quien y cuando
--- Asi un UPDATE que cambia 500 tarifas deja 500 registros con el mismo
--- usuario y la misma marca de tiempo.
+-- El disparador de sentencia no puede leer :OLD ni :NEW, por eso el de
+-- fila guarda los cambios en el paquete y el de sentencia los registra.
 
--- A.2 Antes de la sentencia: lista vacia
+-- Antes de la sentencia: limpia la lista
 CREATE OR REPLACE TRIGGER trg_tarifa_aud_inicio
 BEFORE INSERT OR UPDATE OR DELETE ON TARIFA
 BEGIN
@@ -56,14 +39,13 @@ BEGIN
 END;
 /
 
--- A.3 Por cada fila: guardar valor anterior y nuevo
+-- Por cada fila: guarda el precio anterior y el nuevo
 CREATE OR REPLACE TRIGGER trg_tarifa_aud_fila
 AFTER INSERT OR UPDATE OF precio_noche OR DELETE ON TARIFA
 FOR EACH ROW
 DECLARE
     v_i PLS_INTEGER := PKG_TURISMOUQ.g_cambios_tarifa.COUNT + 1;
 BEGIN
-    -- Un UPDATE que deja el mismo precio no es un cambio
     IF UPDATING AND :OLD.precio_noche = :NEW.precio_noche THEN
         RETURN;
     END IF;
@@ -82,7 +64,7 @@ BEGIN
 END;
 /
 
--- A.4 Disparador a nivel de sentencia: registra la auditoria
+-- Disparador de sentencia: escribe la auditoria
 CREATE OR REPLACE TRIGGER trg_tarifa_auditoria
 AFTER INSERT OR UPDATE OR DELETE ON TARIFA
 DECLARE
@@ -113,20 +95,8 @@ END;
 /
 
 
--- ---------------------------------------------------------------------
--- B. DISPARADOR DE FILA: EVITAR SOLAPES DE RESERVAS (RN01)
---    Antes de insertar una linea en RESERVA_HABITACION busca otra linea
---    de la misma habitacion, de una reserva no cancelada, cuyas fechas se
---    crucen. Dos rangos [entrada, salida) se cruzan cuando
---        entrada_existente < salida_nueva  Y  salida_existente > entrada_nueva
---    (si una sale el 10 y otra entra el 10 no hay solape).
---    Si la nueva linea pertenece a una reserva cancelada no se valida.
---
---    Es BEFORE INSERT porque un disparador de fila no puede consultar su
---    propia tabla durante un UPDATE (error de tabla mutante ORA-04091);
---    en un INSERT ... VALUES de una sola fila Oracle si lo permite. Las
---    reservas se registran con INSERT ... VALUES (sp_crear_reserva).
--- ---------------------------------------------------------------------
+-- B. Disparador de fila: impide registrar una habitacion en fechas
+--    que se cruzan con otra reserva no cancelada
 CREATE OR REPLACE TRIGGER trg_rh_evitar_solape
 BEFORE INSERT ON RESERVA_HABITACION
 FOR EACH ROW
@@ -164,7 +134,7 @@ BEGIN
 END;
 /
 
--- Verificacion: los cuatro disparadores deben quedar ENABLED
+-- Verificacion
 SELECT trigger_name, trigger_type, triggering_event, table_name, status
 FROM USER_TRIGGERS
 ORDER BY table_name, trigger_name;

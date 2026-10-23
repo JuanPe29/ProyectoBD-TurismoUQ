@@ -1,28 +1,11 @@
--- =====================================================================
--- TurismoUQ - Script 03: Consultas de analisis (Entrega 1)
---
--- Como se calcula el ingreso en las consultas 2 a 5 y 7:
---   * Ingreso de una reserva = pagos 'exitoso' - movimientos 'reembolsado'
---     (los pagos fallidos y pendientes no son dinero recibido, RN06/RN07).
---   * Primero se agrega PAGO por reserva y despues se une con el
---     alojamiento. Una reserva puede tener varias habitaciones (varias
---     filas en RESERVA_HABITACION); si se une PAGO directamente con
---     RESERVA_HABITACION el pago se cuenta una vez por habitacion.
---     Por eso se usa reserva_alojamiento: UNA fila por reserva con su
---     alojamiento (todas las habitaciones de una reserva son del mismo
---     alojamiento).
--- =====================================================================
+-- Script 03: consultas de analisis
+-- Ingreso = pagos exitosos - reembolsos. Los pagos se agregan primero por
+-- reserva (reserva_alojamiento) para no contarlos una vez por habitacion.
 
 SET SQLBLANKLINES ON
 
 
--- ---------------------------------------------------------------------
--- 1. Ocupacion por municipio y mes (PIVOT)
---    Noches-habitacion ocupadas (reservas confirmadas o completadas) por
---    municipio y anio, con una columna por mes. Aqui si se usa
---    RESERVA_HABITACION directamente porque cada habitacion ocupada
---    cuenta como ocupacion.
--- ---------------------------------------------------------------------
+-- 1. Ocupacion (noches) por municipio y mes - PIVOT
 SELECT *
 FROM (
     SELECT
@@ -61,12 +44,7 @@ PIVOT (
 ORDER BY municipio, anio;
 
 
--- ---------------------------------------------------------------------
--- 2. Ingresos por municipio, tipo de alojamiento y temporada (ROLLUP)
---    La temporada de una reserva es la categoria (alta, media, baja) de
---    la temporada en la que cae su check-in. GROUPING distingue las filas
---    de subtotal (1) de las filas de detalle (0).
--- ---------------------------------------------------------------------
+-- 2. Ingresos por municipio, tipo de alojamiento y temporada - ROLLUP y GROUPING
 WITH pagos_reserva AS (
     SELECT
         id_reserva,
@@ -153,12 +131,7 @@ ORDER BY
     temporada;
 
 
--- ---------------------------------------------------------------------
--- 3. Los 3 alojamientos de mayor ingreso dentro de cada municipio
---    (RANK con PARTITION BY). El ingreso se agrega primero por reserva y
---    cada reserva se asigna a un solo alojamiento, asi un pago no se
---    cuenta dos veces cuando la reserva tiene varias habitaciones.
--- ---------------------------------------------------------------------
+-- 3. Top 3 alojamientos por ingreso en cada municipio - RANK con PARTITION BY
 WITH pagos_reserva AS (
     SELECT
         id_reserva,
@@ -215,11 +188,7 @@ WHERE posicion <= 3
 ORDER BY municipio, posicion;
 
 
--- ---------------------------------------------------------------------
--- 4. Variacion de ingresos mes contra mes (LAG)
---    Ingreso neto recibido en cada mes (segun la fecha del pago) y su
---    diferencia absoluta y porcentual contra el mes anterior.
--- ---------------------------------------------------------------------
+-- 4. Variacion de ingresos mes contra mes - LAG
 WITH ingresos_mes AS (
     SELECT
         TRUNC(fecha_pago, 'MM') AS mes,
@@ -247,12 +216,7 @@ FROM comparacion
 ORDER BY mes;
 
 
--- ---------------------------------------------------------------------
--- 5. Consulta parametrizada con variables de enlace (rango de fechas)
---    Reservas efectivas (confirmadas o completadas) con check-in dentro
---    del rango, e ingreso neto de esas reservas, por municipio.
---    Para otro rango basta cambiar los EXEC.
--- ---------------------------------------------------------------------
+-- 5. Reservas e ingresos por municipio en un rango de fechas - variables de enlace
 VARIABLE fecha_inicio VARCHAR2(10);
 VARIABLE fecha_fin VARCHAR2(10);
 
@@ -296,13 +260,7 @@ GROUP BY m.nombre
 ORDER BY ingresos DESC;
 
 
--- ---------------------------------------------------------------------
--- 6. UNPIVOT de reservas por estado
---    Primero se cuenta cuantas reservas de cada estado tiene cada
---    municipio (una columna por estado) y luego UNPIVOT convierte esas
---    columnas en filas. Cada reserva se cuenta una sola vez aunque tenga
---    varias habitaciones.
--- ---------------------------------------------------------------------
+-- 6. Reservas por estado en cada municipio - UNPIVOT
 WITH reserva_alojamiento AS (
     SELECT
         rh.id_reserva,
@@ -373,16 +331,8 @@ UNPIVOT (
 ORDER BY municipio, estado;
 
 
--- ---------------------------------------------------------------------
--- 7. Consulta libre
---    Pregunta de negocio: "Que alojamientos estan peor calificados que
---    el promedio de su tipo de alojamiento, y cuanto dinero mueven?"
---    Sirve a la gerencia para priorizar visitas de control de calidad:
---    primero los que estan mas lejos del promedio de su tipo y que mas
---    ingresos generan (un mal servicio ahi afecta a mas clientes).
---    Solo se consideran alojamientos con al menos 20 resenas para que el
---    promedio sea confiable.
--- ---------------------------------------------------------------------
+-- 7. Pregunta de negocio: que alojamientos estan peor calificados que el
+--    promedio de su tipo y cuanto dinero mueven? (minimo 20 resenas)
 WITH pagos_reserva AS (
     SELECT
         id_reserva,

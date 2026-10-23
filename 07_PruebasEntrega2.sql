@@ -1,10 +1,4 @@
--- =====================================================================
--- TurismoUQ - Script 07: Pruebas de la Entrega 2 (evidencia)
--- Ejecuta cada componente con casos que deben funcionar y casos que
--- deben fallar con su error propio. Los mensajes salen por
--- DBMS_OUTPUT (activar la salida en SQL Developer o usar SQL*Plus).
--- Al final se borran las reservas de prueba para dejar los datos igual.
--- =====================================================================
+-- Script 07: pruebas de la Entrega 2
 
 SET SQLBLANKLINES ON
 SET SERVEROUTPUT ON

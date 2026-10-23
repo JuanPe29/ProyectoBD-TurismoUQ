@@ -1,37 +1,16 @@
--- =====================================================================
--- TurismoUQ - Script 06: Tablespace del historico y vista materializada
---                        (Entrega 2)
--- Requiere los privilegios CREATE TABLESPACE, CREATE MATERIALIZED VIEW
--- y CREATE JOB (otorgados en el script 00).
--- =====================================================================
+-- Script 06: tablespace del historico y vista materializada
 
 SET SQLBLANKLINES ON
 
 
--- ---------------------------------------------------------------------
--- A. TABLESPACE PROPIO PARA EL HISTORICO DE RESERVAS
---
--- Por que separarlo:
---   * Las reservas de anios cerrados (2024, 2025) ya no cambian: solo se
---     consultan para reportes y auditoria. Las reservas del anio actual
---     se insertan y actualizan todo el tiempo. Son datos con uso distinto.
---   * En su propio tablespace (y su propio datafile) el historico crece
---     sin ocupar el espacio de las tablas operativas (USERS).
---   * Cuando un anio se cierra el tablespace puede pasar a READ ONLY:
---     nadie puede modificar el historico y se respalda una sola vez, en
---     lugar de copiarlo en cada backup diario.
---   * El datafile puede ubicarse en otro disco, separando la lectura de
---     reportes de la escritura de reservas nuevas.
--- ---------------------------------------------------------------------
--- El datafile se crea en la carpeta por defecto de la base de datos.
+-- A. Tablespace para el historico de reservas (datos de anios cerrados
+--    que ya no cambian: crecen aparte y se pueden dejar en solo lectura)
 CREATE TABLESPACE ts_historico_reservas
     DATAFILE 'ts_historico_reservas01.dbf'
     SIZE 20M
     AUTOEXTEND ON NEXT 10M MAXSIZE 500M;
 
--- Tabla del historico: una fila por reserva ya finalizada, con los datos
--- resumidos que se necesitan en los reportes historicos. La tabla y el
--- indice de su llave primaria quedan dentro del nuevo tablespace.
+-- Tabla del historico dentro del nuevo tablespace
 CREATE TABLE RESERVA_HISTORICO (
     id_reserva       NUMBER NOT NULL,
     id_cliente       NUMBER NOT NULL,
@@ -57,8 +36,7 @@ TABLESPACE ts_historico_reservas;
 COMMENT ON TABLE RESERVA_HISTORICO IS
 'Historico de reservas finalizadas de anios cerrados (tablespace ts_historico_reservas)';
 
--- Se archivan las reservas finalizadas (completadas o canceladas) de los
--- anios cerrados 2024 y 2025. valor_pagado = pagos exitosos - reembolsos.
+-- Se archivan las reservas finalizadas de 2024 y 2025
 INSERT INTO RESERVA_HISTORICO (
     id_reserva, id_cliente, id_alojamiento, fecha_reserva, fecha_checkin,
     fecha_checkout, estado, num_habitaciones, noches, valor_pagado
@@ -94,37 +72,15 @@ GROUP BY r.id_reserva, r.id_cliente, r.fecha_reserva, r.fecha_checkin,
 
 COMMIT;
 
--- Verificacion: la tabla y su indice estan en el tablespace nuevo
+-- Verificacion
 SELECT segment_name, segment_type, tablespace_name, bytes / 1024 / 1024 AS mb
 FROM USER_SEGMENTS
 WHERE tablespace_name = 'TS_HISTORICO_RESERVAS';
 
 
--- ---------------------------------------------------------------------
--- B. VISTA MATERIALIZADA DE OCUPACION MENSUAL
---
--- Una fila por alojamiento y mes (2024-2026) con:
---   habitaciones, noches disponibles (habitaciones x dias del mes),
---   noches ocupadas, reservas y porcentaje de ocupacion.
--- Solo cuentan reservas confirmadas o completadas.
--- Las noches de una estadia que pasa de un mes a otro se reparten: del
--- 30 de enero al 2 de febrero son 2 noches en enero y 1 en febrero.
---   noches en el mes = LEAST(salida, inicio mes siguiente)
---                    - GREATEST(entrada, inicio del mes)
---
--- Politica de refresco: COMPLETO, automatico todos los dias a las 2:00 a.m.
---   * La ocupacion mensual es un reporte de gerencia: no necesita estar
---     al segundo; con los datos hasta el dia anterior es suficiente.
---   * ON COMMIT obligaria a recalcular la vista en cada reserva nueva,
---     haciendo mas lenta la operacion diaria de la plataforma.
---   * FAST (incremental) no se puede usar con esta consulta: genera los
---     meses con CONNECT BY, usa LEFT JOIN y subconsultas, y ademas
---     necesitaria MATERIALIZED VIEW LOGs en varias tablas.
---   * Un refresco completo recalcula unas 33.000 lineas de reserva en
---     pocos segundos, en la madrugada cuando casi no hay uso.
--- Si se necesita antes, se puede refrescar a mano:
---   EXEC DBMS_MVIEW.REFRESH('MV_OCUPACION_MENSUAL', 'C');
--- ---------------------------------------------------------------------
+-- B. Vista materializada de ocupacion mensual por alojamiento
+--    Refresco completo diario a las 2:00 a.m.: es un reporte de gerencia,
+--    ON COMMIT haria lentas las reservas y la consulta no permite FAST.
 CREATE MATERIALIZED VIEW MV_OCUPACION_MENSUAL
 BUILD IMMEDIATE
 REFRESH COMPLETE
@@ -192,7 +148,7 @@ LEFT JOIN ocupacion o
 COMMENT ON MATERIALIZED VIEW MV_OCUPACION_MENSUAL IS
 'Ocupacion mensual por alojamiento; refresco completo diario a las 2:00 a.m.';
 
--- Verificacion: tipo de refresco y proxima ejecucion programada
+-- Verificacion
 SELECT mview_name, refresh_method, refresh_mode, last_refresh_date
 FROM USER_MVIEWS;
 
