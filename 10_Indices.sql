@@ -488,3 +488,17 @@ PIVOT (
     FOR fase IN ('ANTES' AS antes, 'DESPUES' AS despues)
 )
 ORDER BY consulta;
+
+
+-- =====================================================================
+-- 6. Revalidar la vista materializada
+-- =====================================================================
+-- Crear indices sobre RESERVA, RESERVA_HABITACION y PAGO (tablas base de
+-- MV_OCUPACION_MENSUAL) deja la vista en estado NEEDS_COMPILE. Sigue
+-- respondiendo consultas, pero aparece como INVALID en USER_OBJECTS.
+-- Un refresco completo la recompila y la deja al dia (FRESH / VALID).
+EXEC DBMS_MVIEW.REFRESH('MV_OCUPACION_MENSUAL', 'C')
+
+SELECT mview_name, staleness, compile_state
+FROM USER_MVIEWS
+WHERE mview_name = 'MV_OCUPACION_MENSUAL';
