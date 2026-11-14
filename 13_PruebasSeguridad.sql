@@ -7,7 +7,7 @@
 -- (En Oracle 23ai o posterior la falta de privilegio se informa como ORA-41900.)
 --
 -- Ajustar la cadena de conexion si es necesario (host:puerto/servicio).
-DEFINE conexion = localhost:1521/XEPDB1
+ DEFINE conexion = localhost:1522/FREEPDB1
 
 SET SQLBLANKLINES ON
 SET LINESIZE 200
