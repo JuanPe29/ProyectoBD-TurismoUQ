@@ -1,4 +1,4 @@
--- Script 00: crea el usuario del proyecto (ejecutar como SYSTEM en XEPDB1)
+-- Script 00: crea el usuario del proyecto (ejecutar como SYSTEM en FREEPDB1)
 
 -- Borra el usuario si ya existe
 BEGIN
@@ -39,3 +39,8 @@ GRANT CREATE SESSION,
       CREATE JOB,
       UNLIMITED TABLESPACE
 TO turismouq;
+
+-- Entrega 3: lectura de las vistas dinamicas (V$SQL, V$SESSION, V$LOCK) para
+-- ver el plan real con DBMS_XPLAN.DISPLAY_CURSOR (script 10) y los bloqueos
+-- entre sesiones (script 09)
+GRANT SELECT ANY DICTIONARY TO turismouq;
